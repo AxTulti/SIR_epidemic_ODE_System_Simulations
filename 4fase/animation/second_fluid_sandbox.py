@@ -121,11 +121,6 @@ def plot_current_state(df, fig, ax):
     plt.pause( 1 / fps)
 
 
-def get_trajectory(pos_0, pos_f):
-    p0 = np.asarray(pos_0, dtype=float)
-    pf = np.asarray(pos_f, dtype=float)
-    delta = pf - p0
-    return lambda t: p0 + t * delta
 
 def plot_animation_between_two_states(previous_df, current_df, fig, ax):
     ax.clear()
@@ -136,7 +131,6 @@ def plot_animation_between_two_states(previous_df, current_df, fig, ax):
     circle = mpatches.Circle((0, 0), D/2, edgecolor="black", fill=False, linewidth=2)
     ax.add_patch(circle)
 
-    # Build trajectories person by person — not by group
     trajectories = []
     colors = []
 
@@ -149,7 +143,7 @@ def plot_animation_between_two_states(previous_df, current_df, fig, ax):
         traj = lambda t, x0=x0, y0=y0, dx=dx, dy=dy: np.array([x0 + t*dx, y0 + t*dy])
         trajectories.append(traj)
 
-        # color according to current state (or previous, your choice)
+        # acc to curr state
         state = row_curr.state
         if state == 'S': colors.append("blue")
         elif state == 'I': colors.append("red")
@@ -158,7 +152,7 @@ def plot_animation_between_two_states(previous_df, current_df, fig, ax):
     # Animate
     for tau in np.linspace(0, 1, 20):
         for scatter in ax.collections:
-            scatter.remove()     # remove only scatter points
+            scatter.remove()     # del oly scater
 
         pts = np.array([traj(tau) for traj in trajectories])
         ax.scatter(pts[:,0], pts[:,1], c=colors)
