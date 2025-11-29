@@ -7,13 +7,13 @@ import matplotlib.patches as mpatches
 
 
 # Case 1
-D = 6
+D = 12
 N = 100
 radius = 0.35
 recovery_rate = 0.05
-movement_rate = 0.7
+movement_rate = 0.8
 infectance_rate = 0.35
-fps = 5
+fps = 50
 
 time = np.linspace(0, 8, 112)
 
@@ -23,6 +23,7 @@ def get_normal_displacement():
     
     x = rad_movement * np.cos(theta_movement)
     y = rad_movement * np.sin(theta_movement)
+    
     
     return (x, y)
 
@@ -68,13 +69,16 @@ def get_SIR_numbers(df):
     
     return (suceptible, infected, recovered)
 
-def generate_position():
-    theta = random.random() * 2 * np.pi
-    r = np.sqrt(random.random()) * (D / 2)
+def generate_position(x0, y0):
+    position_valid = False
     
-    
-    x = r * np.cos(theta)
-    y = r * np.sin(theta)
+    while not position_valid:
+        
+        x = np.random.normal(loc = x0, scale = D / 20)
+        y = np.random.normal(loc = y0, scale = D / 20)
+        
+        distance = np.linalg.norm([x, y])
+        position_valid = distance <= D/2
     
     return (x, y)
 
@@ -89,37 +93,6 @@ def get_infected_coord(df):
 def get_recovered_coord(df):
     people = df[df['state'] == 'R']
     return (people.x, people.y)
-
-def plot_current_state(df, fig, ax):
-    ax.clear()
-    X_s, Y_s = get_suceptible_coord(df)
-    X_i, Y_i = get_infected_coord(df)
-    X_r, Y_r = get_recovered_coord(df)
-
-    
-    
-    ax.scatter(X_i, Y_i, color = 'red')
-    ax.scatter(X_s, Y_s, color = 'blue')
-    ax.scatter(X_r, Y_r, color = 'green')
-    
-    # keep stable axis limits so frames don't jump
-    ax.set_xlim(-D/2 - 0.5, D/2 + 0.5)
-    ax.set_ylim(-D/2 - 0.5, D/2 + 0.5)
-
-    # draw legend
-    sus_patch = mpatches.Patch(color='blue', label='Susceptible')
-    inf_patch = mpatches.Patch(color='red', label='Infected')
-    rec_patch = mpatches.Patch(color='green', label='Recovered')
-    
-    ax.legend(handles=[sus_patch, inf_patch, rec_patch], loc='upper right')
-    
-    circle = mpatches.Circle((0, 0), D / 2, edgecolor='black', fill=False, linewidth=2)
-    ax.add_patch(circle)
-    ax.set_aspect('equal')
-    
-    fig.canvas.draw()
-    plt.pause( 1 / fps)
-
 
 
 def plot_animation_between_two_states(previous_df, current_df, fig, ax):
@@ -159,6 +132,36 @@ def plot_animation_between_two_states(previous_df, current_df, fig, ax):
 
         plt.pause(0.001)
     
+
+def plot_current_state(df, fig, ax):
+    ax.clear()
+    X_s, Y_s = get_suceptible_coord(df)
+    X_i, Y_i = get_infected_coord(df)
+    X_r, Y_r = get_recovered_coord(df)
+
+    
+    
+    ax.scatter(X_i, Y_i, color = 'red')
+    ax.scatter(X_s, Y_s, color = 'blue')
+    ax.scatter(X_r, Y_r, color = 'green')
+    
+    # keep stable axis limits so frames don't jump
+    ax.set_xlim(-D/2 - 0.5, D/2 + 0.5)
+    ax.set_ylim(-D/2 - 0.5, D/2 + 0.5)
+
+    # draw legend
+    sus_patch = mpatches.Patch(color='blue', label='Susceptible')
+    inf_patch = mpatches.Patch(color='red', label='Infected')
+    rec_patch = mpatches.Patch(color='green', label='Recovered')
+    
+    ax.legend(handles=[sus_patch, inf_patch, rec_patch], loc='upper right')
+    
+    circle = mpatches.Circle((0, 0), D / 2, edgecolor='black', fill=False, linewidth=2)
+    ax.add_patch(circle)
+    ax.set_aspect('equal')
+    
+    fig.canvas.draw()
+    plt.pause( 1 / fps)
 
 
 def iterate_recovered(df):
@@ -201,8 +204,14 @@ def iterate_infection(df):
 
 df = pd.DataFrame(columns=['x', 'y', 'state', 'infected_rounds', 'id'])
 
+theta = random.random() * 2 * np.pi
+r = np.sqrt(random.random()) * (D / 10)
+
+x0 = np.cos(theta) * r
+y0 = np.sin(theta) * r
+
 for i in range(N):
-    x, y = generate_position()
+    x, y = generate_position( x0, y0 )
     df.loc[len(df)] = [ x, y, 'S', 0, i]
     
 # Choose our Infected
@@ -214,13 +223,10 @@ df.loc[df['id'] == chosen_one, 'state'] = 'I'
 SIR_df = pd.DataFrame(columns=['S', 'I', 'R'])
 fig, ax = plt.subplots()
 
-last_df = df.copy()
 
 for t in time:
     SIR_df.loc[len(SIR_df)] = get_SIR_numbers(df)
-
     last_df = df.copy()
-
     iterate_infection(df)
     iterate_recovered(df)
     get_and_apply_displacements(df)
