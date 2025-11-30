@@ -1,0 +1,563 @@
+---
+title: 'Actividad 1: Modelo SIR'
+author: "E. Crescio, J. Montalvo, E. Uresti"
+date: "Noviembre de 2020"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## El modelo SIR
+
+Consideremos un modelo para describir la dinámica de un grupo de individuos de una población con exposición a una enfermedad que puede contagiarse entre los miembros de la población. Esto puede modelarse como un sistema dinámico denominado $SIR$ para una población de $N$ individuos en la que se considera la interacción entre un conjunto de $S$ individuos *suceptibles* de contraer la enfermedad, un conjunto $I$ de individuos *infectados* y uno conjunto $R$ de individuos *recuperados* de la enfermedad.
+
+Este modelo tiene los siguientes supuestos:
+
+* la probabilidades de infectarse son iguales para todos los individuos de la población;
+
+* la población es homogénea, es decir que los riesgos de infectarse son iguales para toos los suceptibles y que los tiempos para recuperarse son iguales para todos los infectados; y
+
+* el tamaño $N$ de la población es constante.
+
+El modelo maneja los diferentes conjuntos $S$, $I$ y $R$ como si fueran compartimentos bien separados y considera que los individuos pueden pasr de uno a otro en el caso de que se enfermen (cambio $S\rightarrow I$) o que una vez enfermos se recuperen (cambio $I\rightarrow$). Ademas, se asume que un individuo no puede pasar del conjunto de suceptibles directamente al conjunto de recuperados.
+
+Con estos supuestos y consideraciones, las ecuaciones diferenciales del modelo SIR son:
+\[
+\begin{aligned}
+\frac{dS}{dt}&= -\beta \frac{I}{N} S\\
+\frac{dI}{dt}&= \beta\frac{I}{N}S-\gamma I\\\
+\frac{dR}{dt}&= \gamma I
+\end{aligned}
+\]
+
+donde:
+
+* N=S+R+I
+
+* la cantidad $\beta\frac{I}{N}$ representa la razón con que las personas salen del compartimento S (se infectan);
+
+* en la primera ecuación $dS$ representa el cambio debido a las personas que salen del compartimento $S$ (el signo negativo se debe a que las personas salen)
+
+* en la segunda ecuación $dI$ representa el cambio debido a las personas que salen del compartimento $I$ (una parte se debe a las personas que del compartimento $S$ pasan al compartimento $I$, y otra parte se debe a las personas que salen del compartimento $I$ porque se recuperan);
+
+* la cantidad $\gamma$ representa la razón con que las personas se recuperan.
+
+```{r}
+# PACKAGES:
+library(deSolve)
+library(reshape2)
+library(ggplot2)
+
+
+initial_state_values <- c(S = 999999,  # Número de susceptibles inicial
+                                       # 
+                          I = 1,       # Se inicia con una persona infectada
+                          R = 0)       # 
+
+
+#razones en unidades de días^-1
+parameters <- c(beta = 1,      # razón de infección
+                gamma = 0.1)   # razón de recuperación
+
+#valores de tiempo para resolver la ecuación, de 0 a 60 días
+times <- seq(from = 0, to = 60, by = 1)   
+
+sir_model <- function(time, state, parameters) {  
+    with(as.list(c(state, parameters)), {# R obtendrá los nombres de variables a
+                                         # partir de inputs de estados y parametros
+        N <- S+I+R 
+        lambda <- beta * I/N
+        dS <- -lambda * S               
+        dI <- lambda * S - gamma * I   
+        dR <- gamma * I                 
+        return(list(c(dS, dI, dR))) 
+    })
+}
+
+# poner la solución del sistema de ecuaciones en forma de un dataframe
+output <- as.data.frame(ode(y = initial_state_values, 
+                            times = times, 
+                            func = sir_model,
+                            parms = parameters))
+```
+
+
+##  Gráficos de la evolución del sistema
+
+```{r }
+
+output_long <- melt(as.data.frame(output), id = "time")                  
+
+ggplot(data = output_long,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+## Pregunta 1
+
+Analizando el dataframe "output" encuentre el día en que el número de contagios es máximo (el pico de la curva verde). ¿Después de cuántos días del inicio ocurre el máximo? 
+Usando las ecuaciones diferenciales del modelo, encuentre una relación entre los parámetros del modelo válida para el valor de $t$ correspondiente al máximo de la curva de infección.
+
+Analíticamente tenemos que:
+\[
+\begin{aligned}
+\frac{dI}{dt} &= \beta \frac{I}{N} S - \gamma I \\\\
+\frac{dS}{dt} &= -\beta \frac{I}{N} S\\
+
+\frac{\frac{dI}{dt}}{\frac{dS}{dt}} &= -\frac{\beta \frac{I}{N} S - \gamma I}{\beta \frac{I}{N} S}\\
+\frac{\frac{dI}{dt}}{\frac{dS}{dt}} &= \frac{\gamma N}{\beta S} - 1 \\
+\frac{dI}{dS} &= \frac{\gamma N}{\beta S} - 1 \\
+dI &= (\frac{\gamma N}{\beta S} - 1) dS \\
+\int_{I_0}^{I} dI &= \int_{S_0}^{S} (\frac{\gamma N}{\beta S} - 1) dS\\
+\textit{Since $I_0 = 1$ and $S_0 = N-1$}\\
+\int_{1}^{I} dI &= \int_{N-1}^{S} (\frac{\gamma N}{\beta S} - 1) dS\\
+I - 1 &= -S + \frac{\gamma N }{\beta} \ln{S} \Big|_{N-1}^{S}\\
+I &= (N-1) - S + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(S)}] + 1 \\
+(1)  I &= N - S + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(S)}] \\\\\\
+\textit{ Substituting (1) into our original System for $\frac{dS}{dt}$ we have}\\
+\frac{dS}{dt} &= -\beta \frac{N - S + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(S)}]}{N} S\\
+-\frac{N dS}{ \beta S [N - S + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(S)}]]} &= dt\\
+-\int_{S_0}^{S} \frac{N dS}{ \beta S [N - S + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(S)}]]} &= \int_{t_0}^{t_{max}} dt\\\\
+
+\textit{ Now we need to find S integral upper limit }\\
+\textit{We know that $\frac{dI}{dt} = 0$ at the maximum value. Then:}\\
+\frac{dI}{dt} &= \beta \frac{I}{N} S - \gamma I \\
+(2) S &= \gamma I \frac{N}{I \beta } \\
+
+\therefore \\
+-\int_{S_0}^{\gamma \frac{N}{ \beta }} \frac{N dS}{ \beta S [N - S + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(S)}]]} &= \int_{t_0}^{t_{max}} dt\\\\
+
+\int_{\gamma \frac{N}{ \beta }}^{N-1 } \frac{N dS}{ \beta S [N - S + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(S)}]]} &= \int_{t_0}^{t_{max}} dt\\\\
+
+\textit{ Substituting (2) in (1) We have}\\
+I_{max} &= (N-1) - \gamma \frac{N}{\beta } + \frac{\gamma N }{\beta} [\ln{(N-1)} - \ln{(\gamma \frac{N}{\beta })}] + 1\\
+
+
+\end{aligned}
+\]
+```{python}
+# Compute analitical solution
+import numpy as np
+from scipy.integrate import quad, odeint
+import matplotlib.pyplot as plt
+
+beta = 1.0
+gamma = 0.1
+N = 1000000
+
+S_0 = N - 1
+I_0 = 1
+R_0 = 0
+
+
+# S upper limit
+S_h = gamma * N / beta
+
+print(f"Valor de S_h: {S_h:.2f}")
+
+# I = 1 / (gamma * (N - R - (N-1)*exp(-beta/(N*gamma) * R)))
+
+I_respect_to_S = lambda S: -S + N + ((gamma * N) / beta) * (np.log(S/(N-1)))
+
+integrand = lambda S: -N / (beta * S * I_respect_to_S(S))
+
+# Numerical integration
+t_h, error = quad(integrand, N-1, S_h)
+
+print(f"Tiempo en el que I es máximo por integración numérica: {t_h:.4f} días")
+```
+
+
+
+```{python}
+import numpy as np
+import pandas as pd
+
+data = pd.DataFrame(r.output)
+
+# Índice en el que I es máximo
+max_index = data.idxmax().I
+value = data.iloc[max_index].I
+
+print("Día de mayor infección: ", max_index)
+print("Cantidad de infectados: ", value)
+
+```
+Se puede apreciar que el mayor valor de infectados ocurrió en el día 18, en que existieron 669741.3834 infecciones.
+
+## Pregunta 2
+
+Analizando el dataframe "output" encuentre después de cuántos días el número de "susceptibles" se reduce  a la mitad.  Usando la ecuación diferencial que expresa la variación del número de susceptibles, encuentre de manera analítica una fórmula que exprese el tiempo $t$ necesario para que el número de susceptibles sea la mitad del valor incial en función de $\beta$.
+
+```{python}
+
+# S inicial
+N = 1000000
+N_half = N / 2
+
+# Encontramos una tabla de diferencias con respecto al valor que buscamos, para obtener el más parecido
+differences_with_half = (data['S'] - N_half).abs()
+
+idx_closest = differences_with_half.idxmin()
+value_closest = data.iloc[idx_closest].S
+print(f"El día mas cercano a la mitad de los suceptibles iniciales ({N_half}), fue el día {idx_closest} en el que habían {value_closest} suceptibles.")
+```
+Analíticamente tenemos que:
+\[
+\begin{aligned}
+\frac{dS}{dt} &= -\beta \frac{I}{N} S\\
+\frac{dR}{dt} &= \gamma I \\\\
+\frac{\frac{dS}{dt}}{\frac{dR}{dt}} &= -\frac{\beta I S}{N \gamma I}\\\\
+\frac{dS}{dR} &= -\frac{\beta I S}{N \gamma I}\\
+\frac{dS}{dR} &= -\frac{\beta S}{N \gamma}\\
+
+\frac{dS}{S} &= -\frac{\beta}{N \gamma} dR\\
+\ln{S} &= -\frac{\beta}{N \gamma} dR\\
+S &= Ce^{-{\frac{\beta}{N \gamma}}R} \\
+S(0) &= N-1\\
+N-1 &= Ce^{-{\frac{\beta}{N \gamma}}0} \\
+N-1 &= C \\
+\therefore \\
+S &= (N-1)e^{-{\frac{\beta}{N \gamma}}R} \\
+\textit{We know that } N &= I + R + S\\
+\textit{Then } I &= N - R - S\\
+\frac{dR}{dt} &= \gamma I\\
+\therefore \\
+\frac{dR}{dt} &= \gamma ( N - R - S )\\
+\frac{dR}{\gamma ( N - R - S )} &= dt\\
+
+\int_{R_0}^{R}\frac{dR}{\gamma ( N - R - S )} &= \int_{t_0}^{t}dt\\
+\int_{R_0}^{R}\frac{dR}{\gamma ( N - R - (N-1)e^{-{\frac{\beta}{N \gamma}}R} )} &= \int_{t_0}^{t}dt\\\\
+\textit{Since $R_0$ = 0, and $t_0$ = 0}\\\\
+\int_{0}^{R}\frac{dR}{\gamma ( N - R - (N-1)e^{-{\frac{\beta}{N \gamma}}R} )} &= \int_{0}^{t}dt\\
+\int_{0}^{R}\frac{dR}{\gamma ( N - R - (N-1)e^{-{\frac{\beta}{N \gamma}}R} )} &= t\\\\\\
+\textit{This is valid $\forall t \in \mathbb{R}^+$ } \\\\
+\textit{Now we Apply the fact that } S(R_h) &= \frac{N}{2} \textit{ To get the specific $t_h$}\\
+S(R_h) &= (N-1)e^{-{\frac{\beta}{N \gamma}}R_h} \\
+\frac{N}{2} &= (N-1)e^{-{\frac{\beta}{N \gamma}}R_h} \\
+\frac{N}{2(N-1)} &= e^{-{\frac{\beta}{N \gamma}}R_h} \\
+\ln{\frac{N}{2(N-1)}} &= \ln{e^{-{\frac{\beta}{N \gamma}}R_h}} \\
+
+\ln{N} - \ln{2(N-1)} &= - {\frac{\beta}{N \gamma}} R_h \\
+\frac{N \gamma [\ln{2(N-1)} - \ln{N}]}{\beta} &=  R_h \\\\\\
+
+\textit{Thus, the complete expression is: }\\\\
+\int_{0}^{R_h}\frac{dR}{\gamma ( N - R - (N-1)e^{-{\frac{\beta}{N \gamma}}R} )} &= t\\
+\therefore \\
+\int_{0}^{\frac{N \gamma [\ln{2(N-1)} - \ln{N}]}{\beta}}\frac{dR}{\gamma ( N - R - (N-1)e^{-{\frac{\beta}{N \gamma}}R} )} &= t\\
+\end{aligned}
+\]
+
+```{python}
+import numpy as np
+from scipy.integrate import quad, odeint
+import matplotlib.pyplot as plt
+
+beta = 1.0
+gamma = 0.1
+N = 1000000
+
+S_0 = N - 1
+I_0 = 1
+R_0 = 0
+
+
+# Rh = (N * gamma / beta) * ln(2*(N-1)/N)
+R_h = (N * gamma / beta) * np.log((2 * (N - 1)) / N)
+
+print(f"Valor de R_h: {R_h:.2f}")
+
+# I = 1 / (gamma * (N - R - (N-1)*exp(-beta/(N*gamma) * R)))
+
+S_respect_to_R = lambda R: (N - 1) * np.exp((-beta / (N * gamma)) * R)
+I_respect_to_R = lambda R: N - R - S_respect_to_R(R)
+integrand = lambda R: 1 / (gamma * I_respect_to_R(R))
+
+# Numerical integration
+t_h, error = quad(integrand, 0, R_h)
+
+print(f"Tiempo en el que S = N/2 por integración numérica: {t_h:.4f} días")
+
+# Verification With Python scypi odeint
+
+def deriv(y, t, N, beta, gamma):
+    S, I, R = y
+    dSdt = -beta * S * I / N
+    dIdt = beta * S * I / N - gamma * I
+    dRdt = gamma * I
+    return dSdt, dIdt, dRdt
+
+y0 = N-1, 1, 0
+
+ret = odeint(deriv, y0, [0, t_h], args=(N, beta, gamma))
+S_final, I_final, R_final = ret[-1]
+
+print(f"N/2 =  {N/2:,.0f}")
+print(f"S en el tiempo calculado (t={t_h:.2f}) =  {S_final:,.0f}")
+print(f"Error =  {abs(S_final - N/2):.4f}")
+```
+La solución analítica (estimada numéricamente con Python) se aproxima con un margen de error bastante pequeño al tiempo en el que S(t) = N/2 segun odeint. Obtenemos así que
+\[
+\int_{0}^{\frac{N \gamma [\ln{2(N-1)} - \ln{N}]}{\beta}} \frac{dR}{\gamma ( N - R - (N-1)e^{-{\frac{\beta}{N \gamma}}R} )} = t
+\]
+Representa de forma precisa el tiempo cuando S(t) = N/2
+
+
+## Pregunta 3
+
+Estudie la dinámica del contagio variando los parámetros $\beta$ y $gamma$. Empiece con $gamma=0.1$ constante  cambiando $\beta$ (que representa la 'fuerza' de la infeccion):
+
+* $\beta=0.1$  365 días
+
+* $\beta=0.3$  365 días
+
+* $\beta=0.7$  60 días
+
+* $\beta=0.9$  60 días
+
+* $\beta=1.2$  60 días
+
+ 
+
+```{r}
+# Generate Dataframes for multiple Beta Values (Using R for better plot aestetics)
+
+times_1_yr = seq(from = 0, to = 360, by = 1)
+
+output_Beta_1 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times_1_yr, 
+                            func = sir_model,
+                            parms = c(beta = 0.1, gamma = 0.1)))
+
+output_Beta_2 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times_1_yr, 
+                            func = sir_model,
+                            parms = c(beta = 0.3, gamma = 0.1)))
+
+output_Beta_3 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times, 
+                            func = sir_model,
+                            parms = c(beta = 0.7, gamma = 0.1)))
+
+output_Beta_4 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times, 
+                            func = sir_model,
+                            parms = c(beta = 0.9, gamma = 0.1)))
+
+output_Beta_5 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times, 
+                            func = sir_model,
+                            parms = c(beta = 1.2, gamma = 0.1)))
+
+output_long_B_1 <- melt(as.data.frame(output_Beta_1), id = "time") 
+output_long_B_2 <- melt(as.data.frame(output_Beta_2), id = "time")  
+output_long_B_3 <- melt(as.data.frame(output_Beta_3), id = "time")  
+output_long_B_4 <- melt(as.data.frame(output_Beta_4), id = "time")  
+output_long_B_5 <- melt(as.data.frame(output_Beta_5), id = "time")
+```
+
+#### Gráfica para $\beta = 0.1$ A un año
+```{r}
+ggplot(data = output_long_B_1,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+#### Gráfica para $\beta = 0.3$ A un año
+```{r}
+ggplot(data = output_long_B_2,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+#### Gráfica para $\beta = 0.7$ A un mes
+```{r}
+ggplot(data = output_long_B_3,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+#### Gráfica para $\beta = 0.9$ A un mes
+```{r}
+ggplot(data = output_long_B_4,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+#### Gráfica para $\beta = 1.2$ A un mes
+```{r}
+ggplot(data = output_long_B_5,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+Comente acerca de los cambios que se observan en las curvas. Encuentre una relación entre $\beta$ y $\gamma$ necesaria para que ocurra la epidemia.  Para que haya una epidemia la fuerza de infección ($\beta$) debe ser suficientemente alta por un tiempo suficientemente largo ($\gamma$ suficientemente bajo) de manera que se pueda transmitir el agente patógeno. A partir de este estudio se puede definir el coeficiente $R_0$ de la infección.
+
+A medida que se incrementa $\beta$ el día de máximas infecciones ocurre antes, al igual que el estado de equilibrio. Esto ocurre ya que $\beta$ está relacionado con la fuerza que tiene la enfermedad para infectar, de modo que a mayor valor de $\beta$, mayor es su infecciosidad.
+
+El valor $R_0$ es conocido como el número reproductivo básico, y determina la dinámica de una enfermedad regida por SIR. Se define como $R_0 = \frac \beta  \gamma$. Este indicador explica diferentes comportamientos según su valor.
+
+Si $R_0 \in [0, 1)$ La enfermedad la enfermedad desaparecerá con el tiempo, ya que cada caso existente causa, en promedio, menos de una nueva infección.
+
+Si $R_0 = 1$ la enfermedad se mantendrá endémica (estable) en la población, pero no causará una epidemia.
+
+Si $R_0 \in [0, \infty)$  la enfermedad se propagará y puede causar una epidemia, ya que cada caso existente causa, en promedio, más de una nueva infección.
+
+
+```{python}
+beta_values = [0.1, 0.3, 0.7, 0.9, 1.2]
+gamma = 0.1
+R_0 = [ beta / gamma for beta in beta_values]
+
+Basic_Reproductive_Number_Table = pd.DataFrame(columns = ["Beta", "Gamma", "R_0"])
+Basic_Reproductive_Number_Table.Beta = beta_values
+Basic_Reproductive_Number_Table.Gamma = [gamma] * len(beta_values)
+Basic_Reproductive_Number_Table.R_0 = R_0
+
+print(Basic_Reproductive_Number_Table)
+```
+De lo cual se deduce que la primera gráfica sea la única que no muestre una epidemia, ya que se encuentra desde el inicio en un estado estable.
+
+## Pregunta 4
+
+Después, con $\beta=1$ varíe el valor de $\gamma$:
+
+* $\gamma=0.025$ 60 días
+
+* $\gamma=0.2$ 60 días
+
+* $\gamma=0.5$ 60 días
+
+* $\gamma=1$ 365 días
+
+```{r}
+# Generate Dataframes for multiple Beta Values (Using R for better plot aestetics)
+
+output_Gamma_1 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times, 
+                            func = sir_model,
+                            parms = c(beta = 1, gamma = 0.025)))
+
+output_Gamma_2 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times, 
+                            func = sir_model,
+                            parms = c(beta = 1, gamma = 0.2)))
+
+output_Gamma_3 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times, 
+                            func = sir_model,
+                            parms = c(beta = 1, gamma = 0.5)))
+
+output_Gamma_4 <- as.data.frame(ode(y = initial_state_values, 
+                            times = times_1_yr, 
+                            func = sir_model,
+                            parms = c(beta = 1, gamma = 1)))
+
+output_long_G_1 <- melt(as.data.frame(output_Gamma_1), id = "time") 
+output_long_G_2 <- melt(as.data.frame(output_Gamma_2), id = "time")  
+output_long_G_3 <- melt(as.data.frame(output_Gamma_3), id = "time")  
+output_long_G_4 <- melt(as.data.frame(output_Gamma_4), id = "time")
+```
+
+
+#### Gráfica para $\gamma = 0.025$ A un mes
+```{r}
+ggplot(data = output_long_G_1,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+#### Gráfica para $\gamma = 0.2$ A un mes
+```{r}
+ggplot(data = output_long_G_2,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+#### Gráfica para $\gamma = 0.5$ A un mes
+```{r}
+ggplot(data = output_long_G_3,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+#### Gráfica para $\gamma = 1$ A un año
+```{r}
+ggplot(data = output_long_G_4,                                              
+       aes(x = time, y = value, colour = variable, group = variable)) +  
+  geom_line() +                                                          
+  xlab("Tiempo (días)")+                                                   
+  ylab("Número de individuos") +                                             
+  labs(colour = "Subconjunto") +
+  theme(legend.position = "bottom")
+```
+
+
+Comente acerca de los cambios que se observan en las curvas.
+Encuentre una relación entre $\beta$ y $\gamma$ necesaria para que ocurra la epidemia.  Para que haya una epidemia la fuerza de infección ($\beta$) debe ser suficientemente alta por un tiempo suficientemente largo ($\gamma$ suficientemente bajo) de manera que se pueda transmitir el agente patógeno. A partir de este estudio se puede definir el coeficiente $R_0$ de la infección. 
+
+A medida que se incrementa $\gamma$ el día de máximas infecciones ocurre después, al igual que el estado de equilibrio. Esto ocurre ya que $\gamma$ está inversamente relacionado con la latencia de una enfermedad para cesar de ser infecciosa en un organismo, de modo que a mayor valor de $\beta$, menor es su infecciosidad.
+
+Recordamos que:
+Si $R_0 \in [0, 1)$ La enfermedad la enfermedad desaparecerá con el tiempo, ya que cada caso existente causa, en promedio, menos de una nueva infección.
+
+Si $R_0 = 1$ la enfermedad se mantendrá endémica (estable) en la población, pero no causará una epidemia.
+
+Si $R_0 \in [0, \infty)$  la enfermedad se propagará y puede causar una epidemia, ya que cada caso existente causa, en promedio, más de una nueva infección.
+
+
+```{python}
+gamma_values = [0.025, 0.2, 0.5, 1]
+beta = 1
+R_0 = [ beta / gamma for gamma in gamma_values]
+
+Basic_Reproductive_Number_Table = pd.DataFrame(columns = ["Beta", "Gamma", "R_0"])
+Basic_Reproductive_Number_Table.Beta = [ beta ] * len(gamma_values)
+Basic_Reproductive_Number_Table.Gamma = gamma_values
+Basic_Reproductive_Number_Table.R_0 = R_0
+
+print(Basic_Reproductive_Number_Table)
+```
+
+Lo que explica que en la última gráfica se aprecie un estado endémico de el sistema
