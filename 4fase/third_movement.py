@@ -7,11 +7,11 @@ import matplotlib.patches as mpatches
 
 # Case 1
 D = 5
-N = 160
+N = 200
 radius = 0.35
-recovery_rate = 0.01
-movement_rate = 0.3
-infectance_rate = 0.5
+recovery_rate = 0.05
+movement_rate = 0.8
+infectance_rate = 0.1
 fps = 20
 
 time = np.linspace(0, 8, 112)

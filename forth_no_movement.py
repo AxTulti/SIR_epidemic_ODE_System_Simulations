@@ -124,7 +124,7 @@ for t in time:
     SIR_df.loc[len(SIR_df)] = get_SIR_numbers(df)
     print(SIR_df)
     
-    plot_current_state(df)
+    # plot_current_state(df)
     iterate_infection(df)
     iterate_recovered(df)
 

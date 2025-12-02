@@ -1977,6 +1977,11 @@ infeccion):</p>
 
 times_1_yr = seq(from = 0, to = 360, by = 1)
 
+initial_state_values_2 &lt;- c(S = 999999 - 100000,  # Número de susceptibles inicial
+                                       # 
+                          I = 100000,    # Se inicia con una persona infectada
+                          R = 0)
+############
 output_Beta_1 &lt;- as.data.frame(ode(y = initial_state_values, 
                             times = times_1_yr, 
                             func = sir_model,

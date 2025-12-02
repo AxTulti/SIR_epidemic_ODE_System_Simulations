@@ -146,7 +146,7 @@ initial_state_values <- c(S = 999999,  # Número de susceptibles inicial
 #razones en unidades de días^-1
 parameters_new <- c(beta = 0.4 * 365,      # razón de infección
                 gamma = 0.1 * 365,
-                mu = 1 / 20,
+                mu = 1 / 70,
                 b = 1 / 70
                 ) 
 

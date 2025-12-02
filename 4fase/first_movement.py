@@ -31,6 +31,9 @@ def is_movement_out_of_bounds(x0, y0, x_displacement, y_displacement):
     
     return x_valid and y_valid
 
+
+
+
 def get_and_apply_displacements( df ):
     
     for idx, person in df.iterrows():
